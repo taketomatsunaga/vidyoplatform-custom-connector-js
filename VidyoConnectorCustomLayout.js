@@ -12,6 +12,7 @@ var remoteSources = { max: 5, count: 0, rendered: 0 }
 // rendererSlots[S] is used to render remote share.
 var rendererSlots = ["1", OPEN_REMOTE_SLOT, OPEN_REMOTE_SLOT, OPEN_REMOTE_SLOT, OPEN_REMOTE_SLOT, OPEN_REMOTE_SLOT];
 var sharing = false;
+var currentSlot = 0
 
 // Run StartVidyoConnector when the VidyoClient is successfully loaded
 function StartVidyoConnector(VC, configParams) {
@@ -22,7 +23,7 @@ function StartVidyoConnector(VC, configParams) {
     var selectedLocalCamera = {id: 0, camera: null};
     var cameraPrivacy = false;
     var microphonePrivacy = false;
-    var remoteCameras = {};	
+    var remoteCameras = {};
 
     console.log("Number of remote slots: " + configParams.numRemoteSlots);
     remoteSources.max = configParams.numRemoteSlots;
@@ -30,7 +31,7 @@ function StartVidyoConnector(VC, configParams) {
     window.onresize = function() {
         showRenderers(vidyoConnector);
     };
-    
+
     window.onbeforeunload = function() {
         vidyoConnector.Destruct();
     }
@@ -97,38 +98,68 @@ function StartVidyoConnector(VC, configParams) {
 
         // Handle the camera privacy button, toggle between show and hide.
         $("#cameraButton").click(function() {
-            // CameraPrivacy button clicked
-            cameraPrivacy = !cameraPrivacy;
-            vidyoConnector.SetCameraPrivacy({
-                privacy: cameraPrivacy
-            }).then(function() {
-                if (cameraPrivacy) {
-                    // Hide the local camera preview, which is in slot 0
-                    $("#cameraButton").addClass("cameraOff").removeClass("cameraOn");
-                    vidyoConnector.HideView({ viewId: "renderer0" }).then(function() {
-                        console.log("HideView Success");
-                    }).catch(function(e) {
-                        console.log("HideView Failed");
-                    });
-                } else {
-                    // Show the local camera preview, which is in slot 0
-                    $("#cameraButton").addClass("cameraOn").removeClass("cameraOff");
-                    vidyoConnector.AssignViewToLocalCamera({
-                        viewId: "renderer0",
-                        localCamera: selectedLocalCamera.camera,
-                        displayCropped: configParams.localCameraDisplayCropped,
-                        allowZoom: false
-                    }).then(function() {
-                        console.log("AssignViewToLocalCamera Success");
-                        ShowRenderer(vidyoConnector, "renderer0");
-                    }).catch(function(e) {
-                        console.log("AssignViewToLocalCamera Failed");
-                    });
-                }
-                console.log("SetCameraPrivacy Success");
-            }).catch(function() {
-                console.error("SetCameraPrivacy Failed");
+
+
+           let currentSlotViewId = "renderer"+ currentSlot
+           console.log("RenderTest Hiding " + currentSlotViewId);
+            vidyoConnector.HideView({ viewId: currentSlotViewId }).then(function() {
+                console.log("RenderTest HideView Success");
+            }).catch(function(e) {
+                console.log("RenderTest HideView Failed");
             });
+
+            currentSlot += 1
+
+            if(currentSlot == 6){
+              currentSlot = 0
+            }
+           let newSlotViewId = "renderer"+ currentSlot
+           console.log("RenderTest AssignViewToLocalCamera to" + newSlotViewId);
+
+            vidyoConnector.AssignViewToLocalCamera({
+                viewId: newSlotViewId,
+                localCamera: selectedLocalCamera.camera,
+                displayCropped: configParams.localCameraDisplayCropped,
+                allowZoom: false
+            }).then(function() {
+                console.log("RenderTest AssignViewToLocalCamera Success");
+                ShowRenderer(vidyoConnector, newSlotViewId);
+            }).catch(function(e) {
+                console.log("RenderTest AssignViewToLocalCamera Failed");
+            });
+
+            // // CameraPrivacy button clicked
+            // cameraPrivacy = !cameraPrivacy;
+            // vidyoConnector.SetCameraPrivacy({
+            //     privacy: cameraPrivacy
+            // }).then(function() {
+            //     if (cameraPrivacy) {
+            //         // Hide the local camera preview, which is in slot 0
+            //         $("#cameraButton").addClass("cameraOff").removeClass("cameraOn");
+            //         vidyoConnector.HideView({ viewId: "renderer0" }).then(function() {
+            //             console.log("HideView Success");
+            //         }).catch(function(e) {
+            //             console.log("HideView Failed");
+            //         });
+            //     } else {
+            //         // Show the local camera preview, which is in slot 0
+            //         $("#cameraButton").addClass("cameraOn").removeClass("cameraOff");
+            //         vidyoConnector.AssignViewToLocalCamera({
+            //             viewId: "renderer0",
+            //             localCamera: selectedLocalCamera.camera,
+            //             displayCropped: configParams.localCameraDisplayCropped,
+            //             allowZoom: false
+            //         }).then(function() {
+            //             console.log("AssignViewToLocalCamera Success");
+            //             ShowRenderer(vidyoConnector, "renderer0");
+            //         }).catch(function(e) {
+            //             console.log("AssignViewToLocalCamera Failed");
+            //         });
+            //     }
+            //     console.log("SetCameraPrivacy Success");
+            // }).catch(function() {
+            //     console.error("SetCameraPrivacy Failed");
+            // });
         });
 
         // Handle the microphone mute button, toggle between mute and unmute audio.
@@ -196,7 +227,7 @@ function renderToSlot(vidyoConnector, remoteCameras, participantId, slot) {
     // Render the remote camera to the slot.
     rendererSlots[slot] = participantId;
     remoteCameras[participantId].isRendered = true;
-	
+
 	//Do not crop when rendering to Slot 5, only crop when rendering to other slots
 	if (slot==5) {
 		vidyoConnector.AssignViewToRemoteCamera({
@@ -228,10 +259,10 @@ function renderToSlot(vidyoConnector, remoteCameras, participantId, slot) {
 			console.log("AssignViewToRemoteCamera Failed");
 			rendererSlots[slot] = OPEN_REMOTE_SLOT;
 			remoteCameras[participantId].isRendered = false;
-		});	
-			
+		});
+
 	}
-    
+
 }
 
 function registerEventListeners(vidyoConnector, cameras, microphones, speakers, selectedLocalCamera, remoteCameras, configParams) {
@@ -351,7 +382,7 @@ function registerEventListeners(vidyoConnector, cameras, microphones, speakers, 
         onAdded: function(camera, participant) {
             // Store the remote camera for this participant
             remoteCameras[participant.id] = {camera: camera, isRendered: false};
-            ++remoteSources.count; 
+            ++remoteSources.count;
 			console.log("remoteSources.count: " + remoteSources.count);
             // Check if resource manager allows for an additional source to be rendered.
             if (remoteSources.rendered < remoteSources.max) {
@@ -371,7 +402,7 @@ function registerEventListeners(vidyoConnector, cameras, microphones, speakers, 
         onRemoved: function(camera, participant) {
             console.log("RegisterRemoteCameraEventListener onRemoved participant.id : " + participant.id);
             delete remoteCameras[participant.id];
-            --remoteSources.count; 
+            --remoteSources.count;
 
             // Scan through the renderer slots and if this participant's camera
             // is being rendered in a slot, then clear the slot and hide the camera.
@@ -381,8 +412,8 @@ function registerEventListeners(vidyoConnector, cameras, microphones, speakers, 
                     console.log("Slot found, calling HideView on renderer" + i);
                     vidyoConnector.HideView({ viewId: "renderer" + (i) }).then(function() {
                         console.log("HideView Success");
-                        --remoteSources.rendered;						
-						
+                        --remoteSources.rendered;
+
                         // If a remote camera is not rendered in a slot, replace it in the slot that was just cleared
                         for (var id in remoteCameras) {
                             if (!remoteCameras[id].isRendered) {
@@ -395,7 +426,7 @@ function registerEventListeners(vidyoConnector, cameras, microphones, speakers, 
                     });
                     break;
                 }
-            }			
+            }
         },
         onStateUpdated: function(camera, participant, state) {
             // Camera state was updated
@@ -405,11 +436,11 @@ function registerEventListeners(vidyoConnector, cameras, microphones, speakers, 
     }).catch(function() {
         console.error("RegisterRemoteCameraEventListener Failed");
     });
-	
+
 	function swapTiles(slotA, slotB) {
 		var participantIDA = rendererSlots[slotA];
 		var participantIDB = rendererSlots[slotB];
-		
+
 		rendererSlots[slotA] = participantIDB;
 		rendererSlots[slotB] = participantIDA;
 		vidyoConnector.HideView({ viewId: "renderer" + slotA}).then(function() {
@@ -454,12 +485,12 @@ function registerEventListeners(vidyoConnector, cameras, microphones, speakers, 
             // Consider switching loudest speaker tile if resource manager allows
             // for at least 1 remote source to be rendered.
             if (remoteSources.max > 0) {
-                
+
                 var found = false;
-				
+
 				// Check if the loudest speaker is being rendered in one of the slots
 				for (var i = 1; i < rendererSlots.length; i++) {
-					
+
                     if (rendererSlots[i] === participant.id) {
                         found = true;
 						if (i != 5) {
@@ -501,10 +532,10 @@ function registerEventListeners(vidyoConnector, cameras, microphones, speakers, 
     }).catch(function() {
         console.err("RegisterParticipantEventListener Failed");
     });
-	
+
 	vidyoConnector.RegisterRemoteWindowShareEventListener({
-        onAdded: function(remoteWindowShare, participant) {			
-			
+        onAdded: function(remoteWindowShare, participant) {
+
 			if (sharing) {
 				vidyoConnector.HideView({ viewId: "rendererS" }).then(function() {
 					console.log("HideView Success");
@@ -512,7 +543,7 @@ function registerEventListeners(vidyoConnector, cameras, microphones, speakers, 
 					console.log("HideView Failed");
 				});
 			}
-						
+
 			vidyoConnector.AssignViewToRemoteWindowShare({
 				viewId: "rendererS",
 				remoteWindowShare: remoteWindowShare,
@@ -522,26 +553,26 @@ function registerEventListeners(vidyoConnector, cameras, microphones, speakers, 
 				console.log("AssignViewToRemoteWindowShare " + participant.id + " to slot S " + retValue);
 				sharing = true
 				updateRenderers(vidyoConnector, true);
-				ShowRenderer(vidyoConnector, "rendererS");					
-				
+				ShowRenderer(vidyoConnector, "rendererS");
+
 			}).catch(function() {
 				console.log("AssignViewToRemoteWindowShare Failed");
 			});
-            
+
         },
-        onRemoved: function(remoteWindowShare, participant) {			
-			
+        onRemoved: function(remoteWindowShare, participant) {
+
 			vidyoConnector.HideView({ viewId: "rendererS" }).then(function() {
-                console.log("HideView Success");				
+                console.log("HideView Success");
 				sharing = false;
 				updateRenderers(vidyoConnector, true);
-                
+
 			}).catch(function(e) {
                 console.log("HideView Failed");
-            });			
-			
+            });
+
             console.log("RegisterRemoteWindowShareEventListener onRemoved participant.id : " + participant.id);
-            		
+
         },
         onStateUpdated: function(remoteWindowShare, participant, state) {
             // Remote Window Share state was updated
@@ -551,7 +582,7 @@ function registerEventListeners(vidyoConnector, cameras, microphones, speakers, 
     }).catch(function() {
         console.error("RegisterRemoteWindowShareEventListener Failed");
     });
-	
+
 }
 
 function handleDeviceChange(vidyoConnector, cameras, microphones, speakers) {
@@ -652,7 +683,7 @@ function updateRenderers(vidyoConnector, fullscreen) {
         $("#renderer2").css({'position': 'absolute', 'left':  '20%', 'right': '60%', 'top': '70%', 'bottom': '0px',  'width': '20%','background-color': 'darkgray'});
         $("#renderer0").css({'position': 'absolute', 'left': '40%', 'right': '40%', 'top': '70%', 'bottom': '0px',  'width': '20%','background-color': 'gray'});
         $("#renderer3").css({'position': 'absolute', 'left': '60%', 'right':  '20%', 'top': '70%', 'bottom': '0px',  'width': '20%','background-color': 'darkgray'});
-        $("#renderer4").css({'position': 'absolute', 'left':  '80%', 'right': '0px', 'top': '70%', 'bottom': '0px', 'width': '20%', 'background-color': 'gray'});        
+        $("#renderer4").css({'position': 'absolute', 'left':  '80%', 'right': '0px', 'top': '70%', 'bottom': '0px', 'width': '20%', 'background-color': 'gray'});
     } else {
         $("#options").removeClass("optionsHide");
         $("#rendererContainer").css({'position':'absolute','top': '0px', 'right': '0px', 'left': '350px', 'bottom': '60px', 'z-index': '99'})
@@ -740,7 +771,7 @@ function connectToConference(vidyoConnector, remoteCameras, configParams) {
                             if (!remoteCameras[id].isRendered) {
                                 // If an open slot is found then render remote camera stream to it.
                                 var openSlot = findOpenSlot();
-                                if (openSlot > 0) 
+                                if (openSlot > 0)
                                     renderToSlot(vidyoConnector, remoteCameras, id, openSlot);
 
                                 // Check if we have added our allotment of remote sources. If so, then break out of loop.
